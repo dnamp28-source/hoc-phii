@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Học Phí Trung Tâm</title>
+    <!-- Tailwind CSS để tạo giao diện hiện đại -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome để vẽ các icon đẹp mắt -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .toast-notification {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- HEADER HỆ THỐNG -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-100">
+                    <i class="fa-solid fa-graduation-cap text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight leading-none">EDU-MANAGER</h1>
+                    <span class="text-xs text-slate-500 font-medium">Hệ thống quản lý học phí thông minh</span>
+                </div>
+            </div>
+            
+            <!-- CHUYỂN ĐỔI GIAO DIỆN PHỤ HUYNH <-> ADMIN -->
+            <div class="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60">
+                <button id="btn-parent-tab" onclick="switchTab('parent')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 bg-white text-indigo-600 shadow-sm">
+                    <i class="fa-solid fa-user-shield"></i>
+                    Phụ Huynh Tra Cứu
+                </button>
+                <button id="btn-admin-tab" onclick="switchTab('admin')" class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 text-slate-600 hover:text-slate-900">
+                    <i class="fa-solid fa-user-gear"></i>
+                    Ban Quản Trị
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- KHU VỰC THÔNG BÁO NỔI (TOAST) -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 max-w-md w-full pointer-events-none"></div>
+
+    <!-- NỘI DUNG CHÍNH -->
+    <main class="max-w-6xl w-full mx-auto p-4 flex-grow">
+
+        <!-- ==================== TAB 1: PHỤ HUYNH TRA CỨU ==================== -->
+        <section id="tab-parent" class="space-y-6">
+            <!-- Form Tìm Kiếm -->
+            <div class="max-w-xl mx-auto bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 text-center mt-6">
+                <h2 class="text-xl font-bold text-slate-900 mb-2">Tra Cứu Học Phí Học Sinh</h2>
+                <p class="text-sm text-slate-500 mb-6">Nhập Số điện thoại đăng ký học hoặc Số CCCD để xem chi tiết học phí và thanh toán.</p>
+                
+                <div class="space-y-3">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" id="parent-search-input" placeholder="Ví dụ: 0987654321 hoặc 001203004567..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all">
+                    </div>
+                    <button onclick="parentSearch()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-search"></i> Tra Cứu Ngay
+                    </button>
+                </div>
+            </div>
+
+            <!-- Kết Quả Tìm Kiếm (Mặc định ẩn) -->
+            <div id="parent-result-box" class="hidden max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 mt-6">
+                <!-- Thông tin học sinh & Học phí -->
+                <div class="md:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                            <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md" id="p-student-id">HS-XXXX</span>
+                            <h3 class="text-2xl font-bold text-slate-900 mt-2" id="p-student-name">Tên Học Sinh</h3>
+                        </div>
+                        <div id="p-payment-badge" class="px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5">
+                            <i class="fa-solid"></i> <span>Trạng thái</span>
+                        </div>
+                    </div>
+
+                    <!-- Thông tin liên hệ -->
+                    <div class="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-xl">
+                        <div>
+                            <p class="text-slate-400 font-medium">Số điện thoại</p>
+                            <p class="font-semibold text-slate-800" id="p-student-phone">-</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-400 font-medium">Số CCCD</p>
+                            <p class="font-semibold text-slate-800" id="p-student-cccd">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Danh sách các môn học đang tham gia -->
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Môn học đăng ký kỳ này</h4>
+                        <div id="p-classes-list" class="space-y-2">
+                            <!-- Sẽ render bằng JS -->
+                        </div>
+                    </div>
+
+                    <!-- Tổng kết học phí -->
+                    <div class="border-t border-slate-100 pt-4 flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-slate-500 font-medium">Tổng tiền học phí cần đóng</p>
+                            <p class="text-2xl font-extrabold text-indigo-600" id="p-total-fee">0đ</p>
+                        </div>
+                        <div class="text-right text-xs text-slate-400">
+                            <p>Bao gồm phí các lớp đang học</p>
+                            <p>Không phát sinh phụ phí</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cổng chuyển khoản QR -->
+                <div class="md:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col justify-between items-center text-center space-y-4">
+                    <div class="w-full">
+                        <h3 class="font-bold text-slate-900 text-lg">Chuyển Khoản Nhanh</h3>
+                        <p class="text-xs text-slate-500 mt-1">Mã QR đã cấu hình sẵn số tiền & nội dung chuyển khoản định danh.</p>
+                    </div>
+
+                    <!-- Chứa ảnh VietQR -->
+                    <div class="bg-slate-100 p-4 rounded-2xl border border-slate-200/50 relative group">
+                        <img id="p-qr-image" src="" alt="Mã QR chuyển khoản" class="w-56 h-56 object-contain rounded-lg">
+                        <div id="p-qr-overlay" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-4 rounded-2xl hidden">
+                            <div class="bg-emerald-100 text-emerald-600 p-3 rounded-full mb-2">
+                                <i class="fa-solid fa-circle-check text-2xl"></i>
+                            </div>
+                            <p class="font-bold text-emerald-600 text-sm">HỌC PHÍ ĐÃ HOÀN TẤT</p>
+                            <p class="text-xs text-slate-500 mt-1">Cảm ơn phụ huynh đã đóng học phí đúng hạn!</p>
+                        </div>
+                    </div>
+
+                    <div class="w-full space-y-2 text-left bg-slate-50 p-3 rounded-xl text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Ngân hàng:</span>
+                            <span class="font-semibold text-slate-800" id="p-bank-name">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Số tài khoản:</span>
+                            <span class="font-semibold text-slate-800" id="p-bank-account">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Chủ tài khoản:</span>
+                            <span class="font-semibold text-slate-800" id="p-bank-owner">-</span>
+                        </div>
+                        <div class="border-t border-slate-200/60 my-1"></div>
+                        <div class="text-center font-mono text-indigo-600 font-bold bg-indigo-50 py-1.5 rounded" id="p-transfer-content">
+                            Nội dung: HS-XXXX
+                        </div>
+                    </div>
+
+                    <!-- Giả lập gửi thông báo -->
+                    <button id="btn-mock-pay" onclick="simulatedPayByParent()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> Gửi Xác Nhận Đã Chuyển Tiền
+                    </button>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ==================== TAB 2: QUẢN TRỊ ADMIN ==================== -->
+        <section id="tab-admin" class="hidden space-y-6">
+            
+            <!-- HÀNG TRÊN: CẤU HÌNH & TRÌNH GIẢ LẬP ĐỐI SOÁT NGÂN HÀNG -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Cấu hình hệ thống -->
+                <div class="lg:col-span-7 bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+                    <h3 class="font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-gears text-indigo-500"></i> Cấu Hình Kết Nối Hệ Thống
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div class="md:col-span-2">
+                            <label class="block text-slate-500 font-medium mb-1">Đường dẫn Google Apps Script Web App (Tùy chọn)</label>
+                            <input type="text" id="cfg-sheets-url" onchange="saveConfig()" placeholder="Nhập URL do Google cung cấp..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-500 font-medium mb-1">Mã Pin Ngân Hàng (Ví dụ Vietin: 970415)</label>
+                            <input type="text" id="cfg-bank-bin" onchange="saveConfig()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-500 font-medium mb-1">Tên Rút Gọn Ngân Hàng (In trên Web)</label>
+                            <input type="text" id="cfg-bank-name" onchange="saveConfig()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-500 font-medium mb-1">Số Tài Khoản</label>
+                            <input type="text" id="cfg-bank-account" onchange="saveConfig()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-slate-500 font-medium mb-1">Tên Chủ Tài Khoản (Không dấu)</label>
+                            <input type="text" id="cfg-bank-owner" onchange="saveConfig()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between border-t border-slate-100 pt-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" id="status-dot"></span>
+                            <span class="text-xs text-slate-600 font-medium" id="status-text">Đang chạy ở chế độ Offline (Dữ liệu lưu tại máy này)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trình giả lập chuyển khoản ngân hàng (Auto-Banking Simulator) -->
+                <div class="lg:col-span-5 bg-emerald-950 text-emerald-100 p-5 rounded-2xl shadow-sm border border-emerald-900 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-white flex items-center gap-2 text-sm">
+                            <i class="fa-solid fa-landmark text-emerald-400"></i> TRÌNH GIẢ LẬP WEBHOOK NGÂN HÀNG
+                        </h3>
+                        <span class="text-[10px] bg-emerald-800 text-emerald-200 px-2 py-0.5 rounded uppercase font-semibold">Test Auto-banking</span>
+                    </div>
+                    <p class="text-xs text-emerald-300">Tính năng này mô phỏng hoạt động thực tế khi Phụ huynh chuyển khoản ngân hàng quét đúng QR trên điện thoại.</p>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] text-emerald-400 font-bold uppercase mb-1">Chọn học sinh chuyển tiền thử nghiệm</label>
+                            <select id="sim-student-select" class="w-full px-3 py-2 bg-emerald-900 border border-emerald-800 rounded-lg text-xs text-emerald-100 focus:outline-none">
+                                <!-- Render bằng JS -->
+                            </select>
+                        </div>
+                        <button onclick="triggerSimulatedBankWebhook()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg shadow-emerald-950/20 transition-all flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-paper-plane"></i> GỬI TÍN HIỆU NGÂN HÀNG (AUTO-GẠCH NỢ)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DANH SÁCH HỌC SINH -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-6">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Danh Sách Học Viên Trung Tâm</h3>
+                        <p class="text-xs text-slate-500">Quản lý lớp học chéo, tính học phí và theo dõi trạng thái đóng tiền.</p>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="openAddStudentModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-plus"></i> Thêm Học Viên Mới
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bộ lọc & Tìm kiếm nhanh -->
+                <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div class="relative w-full max-w-xs">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fa-solid fa-search text-xs"></i>
+                        </span>
+                        <input type="text" id="admin-search-input" oninput="renderAdminTable()" placeholder="Tìm tên, SĐT hoặc mã học sinh..." class="w-full pl-8 pr-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                    </div>
+                    
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="text-slate-400 font-medium">Lọc theo:</span>
+                        <select id="admin-filter-status" onchange="renderAdminTable()" class="bg-white border border-slate-200 px-3 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <option value="ALL">Tất cả học viên</option>
+                            <option value="Chưa đóng">Chưa đóng học phí</option>
+                            <option value="Đã đóng">Đã đóng học phí</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Bảng danh sách -->
+                <div class="overflow-x-auto rounded-xl border border-slate-150">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold">
+                                <th class="p-3">Mã học viên</th>
+                                <th class="p-3">Họ và Tên</th>
+                                <th class="p-3">SĐT & CCCD</th>
+                                <th class="p-3">Các lớp học đăng ký (Học phí)</th>
+                                <th class="p-3 text-right">Tổng Học Phí</th>
+                                <th class="p-3 text-center">Trạng Thái</th>
+                                <th class="p-3 text-right">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-students-table-body" class="divide-y divide-slate-100">
+                            <!-- Sẽ render bằng JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER CHUYÊN NGHIỆP -->
+    <footer class="bg-slate-900 text-slate-400 py-6 border-t border-slate-800 text-center text-xs mt-12">
+        <div class="max-w-6xl mx-auto px-4 space-y-2">
+            <p class="font-semibold text-slate-300">EDU-MANAGER © 2026 - Giải Pháp Quản Lý Trung Tâm Đào Tạo</p>
+            <p>Phiên bản độc lập dùng trọn đời • Hỗ trợ kết nối API Ngân Hàng đối soát tự động</p>
+        </div>
+    </footer>
+
+
+    <!-- ==================== DIALOG/MODAL: THÊM/SỬA HỌC SINH ==================== -->
+    <div id="student-modal" class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center">
+                <h3 id="modal-title" class="font-bold text-slate-900">Thêm Học Viên Mới</h3>
+                <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Content -->
+            <div class="p-5 space-y-4 text-xs">
+                <!-- Mã học sinh (Nếu sửa thì hiển thị) -->
+                <div id="modal-field-id" class="hidden">
+                    <label class="block text-slate-400 font-bold mb-1 uppercase text-[10px]">Mã học sinh</label>
+                    <input type="text" id="m-student-id" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg font-mono">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-slate-500 font-bold mb-1">Họ và tên học viên *</label>
+                        <input type="text" id="m-student-name" placeholder="Ví dụ: Nguyễn Minh Đức" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 font-bold mb-1">Số điện thoại phụ huynh *</label>
+                        <input type="text" id="m-student-phone" placeholder="Ví dụ: 0912345678" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-500 font-bold mb-1">Số CCCD (Dùng tra cứu thay thế)</label>
+                    <input type="text" id="m-student-cccd" placeholder="Nhập số CCCD học sinh/phụ huynh" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <!-- Cấu hình học lớp chéo (Tối đa 3 môn để quản lý học chéo dễ dàng) -->
+                <div class="border-t border-slate-100 pt-3">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="font-bold text-slate-900 text-sm">Đăng ký lớp học & Phí môn</label>
+                        <button onclick="addMoneToModal()" class="text-indigo-600 font-semibold hover:text-indigo-800 flex items-center gap-1">
+                            <i class="fa-solid fa-circle-plus"></i> Đăng ký thêm môn
+                        </button>
+                    </div>
+                    
+                    <div id="modal-classes-container" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                        <!-- Danh sách môn sẽ tự render bằng JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-slate-50 border-t border-slate-100 p-4 flex justify-end gap-2">
+                <button onclick="closeStudentModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-100">Hủy</button>
+                <button onclick="saveStudentFromModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-100">Lưu thông tin</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- CODE JAVASCRIPT HỆ THỐNG -->
+    <script>
+        // --- 1. DỮ LIỆU BAN ĐẦU (MOCK DATA KHI KHÔNG CÓ GOOGLE SHEETS) ---
+        const DEFAULT_STUDENTS = [
+            {
+                id: "HS-101",
+                name: "Nguyễn Minh Đức",
+                phone: "0912345678",
+                cccd: "001204001234",
+                classes: [
+                    { name: "Toán lớp 9 nâng cao", fee: 1200000 },
+                    { name: "Tiếng Anh IELTS 6.5", fee: 2000000 }
+                ],
+                totalFee: 3200000,
+                status: "Chưa đóng"
+            },
+            {
+                id: "HS-102",
+                name: "Phạm Khánh Vy",
+                phone: "0987654321",
+                cccd: "001205005678",
+                classes: [
+                    { name: "Vật Lý lớp 10", fee: 1000000 },
+                    { name: "Hóa Học lớp 10", fee: 1000000 },
+                    { name: "Toán lớp 10", fee: 1200000 }
+                ],
+                totalFee: 3200000,
+                status: "Chưa đóng"
+            },
+            {
+                id: "HS-103",
+                name: "Trần Bảo Nam",
+                phone: "0909090909",
+                cccd: "001206009999",
+                classes: [
+                    { name: "Toán lớp 12 VIP", fee: 1500000 }
+                ],
+                totalFee: 1500000,
+                status: "Đã đóng"
+            }
+        ];
+
+        // --- 2. BIẾN TOÀN CỤC CỦA HỆ THỐNG ---
+        let students = [];
+        let activeTab = 'parent';
+        let currentModalMode = 'ADD'; // ADD hoặc EDIT
+        let selectedStudentForEdit = null;
+
+        // --- 3. ĐỌC / GHI CẤU HÌNH HỆ THỐNG ---
+        let config = {
+            sheetsUrl: '',
+            bankBin: '970415', // MB Bank mặc định
+            bankName: 'MB BANK',
+            bankAccount: '1234567890',
+            bankOwner: 'NGUYEN VAN A'
+        };
+
+        // --- 4. KHỞI CHẠY HỆ THỐNG ---
+        window.onload = function() {
+            loadConfig();
+            loadStudentsData();
+            switchTab('parent');
+            
+            // Tự động kiểm tra trạng thái nộp tiền mỗi 5 giây
+            setInterval(() => {
+                if (config.sheetsUrl) {
+                    syncWithGoogleSheets();
+                }
+            }, 5000);
+        };
+
+        // --- 5. HÀM QUẢN LÝ DỮ LIỆU VÀ CẤU HÌNH ---
+        function loadConfig() {
+            const savedConfig = localStorage.getItem('edu_manager_config');
+            if (savedConfig) {
+                config = JSON.parse(savedConfig);
+            }
+            // Điền cấu hình vào input Admin
+            document.getElementById('cfg-sheets-url').value = config.sheetsUrl || '';
+            document.getElementById('cfg-bank-bin').value = config.bankBin || '970415';
+            document.getElementById('cfg-bank-name').value = config.bankName || 'MB BANK';
+            document.getElementById('cfg-bank-account').value = config.bankAccount || '1234567890';
+            document.getElementById('cfg-bank-owner').value = config.bankOwner || 'NGUYEN VAN A';
+            
+            updateConnectionStatus();
+        }
+
+        function saveConfig() {
+            config.sheetsUrl = document.getElementById('cfg-sheets-url').value.trim();
+            config.bankBin = document.getElementById('cfg-bank-bin').value.trim();
+            config.bankName = document.getElementById('cfg-bank-name').value.trim().toUpperCase();
+            config.bankAccount = document.getElementById('cfg-bank-account').value.trim();
+            config.bankOwner = document.getElementById('cfg-bank-owner').value.trim().toUpperCase();
+
+            localStorage.setItem('edu_manager_config', JSON.stringify(config));
+            showToast("Thành công", "Đã lưu cấu hình tài khoản trung tâm!", "success");
+            updateConnectionStatus();
+            
+            if (config.sheetsUrl) {
+                syncWithGoogleSheets();
+            }
+        }
+
+        function updateConnectionStatus() {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            if (config.sheetsUrl) {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                text.innerText = "Trực tuyến: Đang đồng bộ hóa với Google Sheets";
+            } else {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+                text.innerText = "Ngoại tuyến: Dữ liệu đang được lưu trữ tại bộ nhớ trình duyệt của máy này.";
+            }
+        }
+
+        function loadStudentsData() {
+            const localData = localStorage.getItem('edu_manager_students');
+            if (localData) {
+                students = JSON.parse(localData);
+            } else {
+                students = [...DEFAULT_STUDENTS];
+                saveStudentsDataToLocal();
+            }
+            renderAdminTable();
+            populateSimulateSelect();
+        }
+
+        function saveStudentsDataToLocal() {
+            localStorage.setItem('edu_manager_students', JSON.stringify(students));
+            populateSimulateSelect();
+        }
+
+        // --- 6. PHÁT PHIẾU BÁO & ÂM THANH "TING TING" ---
+        function playTingTing() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Ting 1
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(880, ctx.currentTime); 
+                gain1.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start();
+                osc1.stop(ctx.currentTime + 0.15);
+
+                // Ting 2
+                setTimeout(() => {
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(1320, ctx.currentTime); 
+                    gain2.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.start();
+                    osc2.stop(ctx.currentTime + 0.3);
+                }, 120);
+            } catch (e) {
+                console.error("Audio block:", e);
+            }
+        }
+
+        function showToast(title, message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast-notification p-4 rounded-xl shadow-lg border text-xs flex items-start gap-3 pointer-events-auto transition-all duration-300 ${
+                type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 
+                type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 
+                'bg-rose-50 border-rose-200 text-rose-800'
+            }`;
+
+            const icon = type === 'success' ? 'fa-circle-check text-emerald-500' :
+                         type === 'warning' ? 'fa-triangle-exclamation text-amber-500' :
+                         'fa-circle-xmark text-rose-500';
+
+            toast.innerHTML = `
+                <i class="fa-solid ${icon} text-lg mt-0.5"></i>
+                <div class="flex-grow">
+                    <p class="font-bold text-slate-900">${title}</p>
+                    <p class="text-slate-600 mt-0.5">${message}</p>
+                </div>
+                <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            container.appendChild(toast);
+            
+            // Tự động xóa sau 6 giây
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 6000);
+        }
+
+        // --- 7. CHUYỂN TÁC VỤ TAB TRANG ---
+        function switchTab(tab) {
+            activeTab = tab;
+            const btnParent = document.getElementById('btn-parent-tab');
+            const btnAdmin = document.getElementById('btn-admin-tab');
+            const tabParentBox = document.getElementById('tab-parent');
+            const tabAdminBox = document.getElementById('tab-admin');
+
+            if (tab === 'parent') {
+                btnParent.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 bg-white text-indigo-600 shadow-sm";
+                btnAdmin.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 text-slate-600 hover:text-slate-900";
+                tabParentBox.classList.remove('hidden');
+                tabAdminBox.classList.add('hidden');
+            } else {
+                btnAdmin.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 bg-white text-indigo-600 shadow-sm";
+                btnParent.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 text-slate-600 hover:text-slate-900";
+                tabAdminBox.classList.remove('hidden');
+                tabParentBox.classList.add('hidden');
+                renderAdminTable();
+            }
+        }
+
+        // --- 8. NGHIỆP VỤ: TRA CỨU CỦA PHỤ HUYNH ---
+        function parentSearch() {
+            const searchVal = document.getElementById('parent-search-input').value.trim();
+            if (!searchVal) {
+                showToast("Cảnh báo", "Hãy điền Số điện thoại hoặc Số CCCD để tìm kiếm!", "warning");
+                return;
+            }
+
+            // Tìm kiếm học sinh
+            const matched = students.find(s => s.phone === searchVal || s.cccd === searchVal || s.id.toLowerCase() === searchVal.toLowerCase());
+
+            if (!matched) {
+                showToast("Không tìm thấy", "Không có học viên nào khớp với thông tin đã điền. Hãy liên hệ với trung tâm!", "error");
+                document.getElementById('parent-result-box').classList.add('hidden');
+                return;
+            }
+
+            displayParentResult(matched);
+        }
+
+        function displayParentResult(student) {
+            const resultBox = document.getElementById('parent-result-box');
+            resultBox.classList.remove('hidden');
+
+            document.getElementById('p-student-id').innerText = student.id;
+            document.getElementById('p-student-name').innerText = student.name;
+            document.getElementById('p-student-phone').innerText = student.phone || 'Chưa cập nhật';
+            document.getElementById('p-student-cccd').innerText = student.cccd || 'Chưa cập nhật';
+            
+            // Định dạng tiền tệ VND
+            const formatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
+            document.getElementById('p-total-fee').innerText = formatter.format(student.totalFee);
+
+            // Gắn thông tin tài khoản ngân hàng thụ hưởng
+            document.getElementById('p-bank-name').innerText = config.bankName;
+            document.getElementById('p-bank-account').innerText = config.bankAccount;
+            document.getElementById('p-bank-owner').innerText = config.bankOwner;
+            
+            // Nội dung chuyển khoản định danh: HS-{ID}
+            const content = `HS ${student.id.replace('HS-', '')} TUAN KIET DONG HP`;
+            document.getElementById('p-transfer-content').innerText = `Nội dung: ${content}`;
+
+            // Sinh mã QR Động VietQR
+            const qrUrl = `https://img.vietqr.io/image/${config.bankBin}-${config.bankAccount}-compact2.png?amount=${student.totalFee}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(config.bankOwner)}`;
+            document.getElementById('p-qr-image').src = qrUrl;
+
+            // Xử lý huy hiệu trạng thái
+            const statusBadge = document.getElementById('p-payment-badge');
+            const qrOverlay = document.getElementById('p-qr-overlay');
+
+            if (student.status === "Đã đóng") {
+                statusBadge.className = "px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 bg-emerald-100 text-emerald-800";
+                statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Đã đóng học phí`;
+                qrOverlay.classList.remove('hidden');
+                document.getElementById('btn-mock-pay').classList.add('hidden');
+            } else {
+                statusBadge.className = "px-4 py-1.5 rounded-full text-sm font-bold flex items-center gap-1.5 bg-rose-100 text-rose-800 animate-pulse";
+                statusBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Chưa đóng học phí`;
+                qrOverlay.classList.add('hidden');
+                document.getElementById('btn-mock-pay').classList.remove('hidden');
+            }
+
+            // Hiển thị danh sách các môn
+            const listContainer = document.getElementById('p-classes-list');
+            listContainer.innerHTML = '';
+            student.classes.forEach(cls => {
+                const item = document.createElement('div');
+                item.className = "flex justify-between items-center bg-slate-50 border border-slate-150 p-3 rounded-xl";
+                item.innerHTML = `
+                    <span class="font-semibold text-slate-800 text-xs">${cls.name}</span>
+                    <span class="font-bold text-indigo-600 text-xs">${formatter.format(cls.fee)}</span>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        // --- 9. NGHIỆP VỤ: GIẢ LẬP GỬI THÔNG BÁO TỪ PHỤ HUYNH ---
+        function simulatedPayByParent() {
+            const sId = document.getElementById('p-student-id').innerText;
+            const sName = document.getElementById('p-student-name').innerText;
+            const sFee = document.getElementById('p-total-fee').innerText;
+            
+            showToast("Đang gửi", `Gửi minh chứng chuyển khoản của em ${sName} tới trung tâm...`, "warning");
+            
+            setTimeout(() => {
+                showToast("Thành công", `Đã gửi báo cáo thanh toán! Trung tâm sẽ kiểm tra đối soát ngân hàng ngay lập tức.`, "success");
+            }, 1000);
+        }
+
+        // --- 10. NGHIỆP VỤ: QUẢN TRỊ TRUNG TÂM (ADMIN) ---
+        function renderAdminTable() {
+            const tableBody = document.getElementById('admin-students-table-body');
+            const searchVal = document.getElementById('admin-search-input').value.toLowerCase();
+            const filterVal = document.getElementById('admin-filter-status').value;
+            const formatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
+
+            tableBody.innerHTML = '';
+
+            const filtered = students.filter(s => {
+                const matchesSearch = s.name.toLowerCase().includes(searchVal) || 
+                                      s.phone.includes(searchVal) || 
+                                      s.id.toLowerCase().includes(searchVal);
+                const matchesFilter = filterVal === 'ALL' || s.status === filterVal;
+                return matchesSearch && matchesFilter;
+            });
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">Không tìm thấy học sinh nào</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition-colors";
+
+                let classesHtml = '';
+                s.classes.forEach(c => {
+                    classesHtml += `
+                        <div class="flex items-center justify-between gap-2 py-0.5">
+                            <span class="text-slate-600 font-medium">${c.name}</span>
+                            <span class="text-slate-400 font-semibold">${formatter.format(c.fee)}</span>
+                        </div>`;
+                });
+
+                const statusColor = s.status === 'Đã đóng' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+
+                tr.innerHTML = `
+                    <td class="p-3 font-mono font-bold text-indigo-600">${s.id}</td>
+                    <td class="p-3">
+                        <p class="font-bold text-slate-900">${s.name}</p>
+                    </td>
+                    <td class="p-3">
+                        <p class="text-slate-600 font-medium">SĐT: ${s.phone || 'N/A'}</p>
+                        <p class="text-slate-400 text-[10px]">CCCD: ${s.cccd || 'N/A'}</p>
+                    </td>
+                    <td class="p-3 max-w-xs">
+                        <div class="divide-y divide-slate-100/60">${classesHtml}</div>
+                    </td>
+                    <td class="p-3 text-right font-extrabold text-indigo-600">${formatter.format(s.totalFee)}</td>
+                    <td class="p-3 text-center">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold ${statusColor}">${s.status}</span>
+                    </td>
+                    <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                        <button onclick="markStatus('${s.id}', '${s.status === 'Đã đóng' ? 'Chưa đóng' : 'Đã đóng'}')" class="text-xs px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-all">
+                            ${s.status === 'Đã đóng' ? '<i class="fa-solid fa-clock-rotate-left"></i> Chuyển nợ' : '<i class="fa-solid fa-check"></i> Thu tiền'}
+                        </button>
+                        <button onclick="openEditStudentModal('${s.id}')" class="text-xs p-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition-all">
+                            <i class="fa-solid fa-pen-to-square px-1"></i>
+                        </button>
+                        <button onclick="deleteStudent('${s.id}')" class="text-xs p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition-all">
+                            <i class="fa-solid fa-trash px-1"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function populateSimulateSelect() {
+            const select = document.getElementById('sim-student-select');
+            select.innerHTML = '';
+            
+            const unpaid = students.filter(s => s.status !== 'Đã đóng');
+            if (unpaid.length === 0) {
+                const opt = document.createElement('option');
+                opt.text = "Tất cả học sinh đã đóng học phí";
+                select.add(opt);
+                return;
+            }
+
+            unpaid.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.text = `${s.id} - ${s.name} (${s.totalFee.toLocaleString('vi-VN')}đ)`;
+                select.add(opt);
+            });
+        }
+
+        function markStatus(id, newStatus) {
+            const student = students.find(s => s.id === id);
+            if (student) {
+                student.status = newStatus;
+                saveStudentsDataToLocal();
+                renderAdminTable();
+                
+                // Cập nhật lại giao diện phụ huynh nếu đang xem chính học sinh này
+                const activeId = document.getElementById('p-student-id').innerText;
+                if (activeId === id) {
+                    displayParentResult(student);
+                }
+
+                if (newStatus === 'Đã đóng') {
+                    playTingTing();
+                    showToast("Xác nhận thu học phí", `Em ${student.name} đã hoàn thành học phí tháng!`, "success");
+                } else {
+                    showToast("Cập nhật lại nợ", `Đã chuyển em ${student.name} về danh sách nợ phí!`, "warning");
+                }
+            }
+        }
+
+        function deleteStudent(id) {
+            if (confirm(`Bạn có chắc chắn muốn xóa học sinh mã ${id} khỏi hệ thống?`)) {
+                students = students.filter(s => s.id !== id);
+                saveStudentsDataToLocal();
+                renderAdminTable();
+                showToast("Đã xóa", "Đã xóa học sinh khỏi cơ sở dữ liệu!", "error");
+            }
+        }
+
+        // --- 11. XỬ LÝ DIALOG/MODAL: THÊM & SỬA ---
+        let currentModalMonesCount = 0;
+
+        function openAddStudentModal() {
+            currentModalMode = 'ADD';
+            document.getElementById('modal-title').innerText = "Thêm Học Viên Mới";
+            document.getElementById('modal-field-id').classList.add('hidden');
+            
+            // Xóa form cũ
+            document.getElementById('m-student-name').value = '';
+            document.getElementById('m-student-phone').value = '';
+            document.getElementById('m-student-cccd').value = '';
+            
+            const container = document.getElementById('modal-classes-container');
+            container.innerHTML = '';
+            currentModalMonesCount = 0;
+            addMoneToModal(); // Thêm sẵn 1 dòng môn
+
+            document.getElementById('student-modal').classList.remove('hidden');
+        }
+
+        function openEditStudentModal(id) {
+            currentModalMode = 'EDIT';
+            selectedStudentForEdit = students.find(s => s.id === id);
+            if (!selectedStudentForEdit) return;
+
+            document.getElementById('modal-title').innerText = "Sửa Thông Tin Học Viên";
+            document.getElementById('modal-field-id').classList.remove('hidden');
+            document.getElementById('m-student-id').value = selectedStudentForEdit.id;
+
+            document.getElementById('m-student-name').value = selectedStudentForEdit.name;
+            document.getElementById('m-student-phone').value = selectedStudentForEdit.phone;
+            document.getElementById('m-student-cccd').value = selectedStudentForEdit.cccd || '';
+
+            const container = document.getElementById('modal-classes-container');
+            container.innerHTML = '';
+            currentModalMonesCount = 0;
+
+            selectedStudentForEdit.classes.forEach(c => {
+                addMoneToModal(c.name, c.fee);
+            });
+
+            document.getElementById('student-modal').classList.remove('hidden');
+        }
+
+        function closeStudentModal() {
+            document.getElementById('student-modal').classList.add('hidden');
+        }
+
+        function addMoneToModal(name = '', fee = '') {
+            currentModalMonesCount++;
+            const container = document.getElementById('modal-classes-container');
+            const row = document.createElement('div');
+            row.id = `modal-class-row-${currentModalMonesCount}`;
+            row.className = "flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200/50";
+            
+            row.innerHTML = `
+                <input type="text" placeholder="Tên lớp học" value="${name}" class="w-2/3 px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 class-name-input">
+                <input type="number" placeholder="Phí" value="${fee}" class="w-1/3 px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 class-fee-input">
+                <button onclick="removeMoneFromModal(${currentModalMonesCount})" class="text-rose-600 hover:text-rose-800 p-1">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeMoneFromModal(index) {
+            const row = document.getElementById(`modal-class-row-${index}`);
+            if (row) row.remove();
+        }
+
+        function saveStudentFromModal() {
+            const name = document.getElementById('m-student-name').value.trim();
+            const phone = document.getElementById('m-student-phone').value.trim();
+            const cccd = document.getElementById('m-student-cccd').value.trim();
+
+            if (!name || !phone) {
+                showToast("Thiếu dữ liệu", "Họ tên và Số điện thoại là bắt buộc!", "error");
+                return;
+            }
+
+            // Thu thập các môn học
+            const classes = [];
+            let totalFee = 0;
+            const rows = document.getElementById('modal-classes-container').children;
+
+            for (let r of rows) {
+                const clsName = r.querySelector('.class-name-input').value.trim();
+                const clsFee = parseFloat(r.querySelector('.class-fee-input').value);
+
+                if (clsName && !isNaN(clsFee)) {
+                    classes.push({ name: clsName, fee: clsFee });
+                    totalFee += clsFee;
+                }
+            }
+
+            if (classes.length === 0) {
+                showToast("Thiếu dữ liệu", "Học sinh cần học ít nhất một môn!", "error");
+                return;
+            }
+
+            if (currentModalMode === 'ADD') {
+                // Tạo ID tự động
+                const nextId = "HS-" + (students.length > 0 ? (Math.max(...students.map(s => parseInt(s.id.replace('HS-', '')))) + 1) : 101);
+                
+                const newStudent = {
+                    id: nextId,
+                    name: name,
+                    phone: phone,
+                    cccd: cccd,
+                    classes: classes,
+                    totalFee: totalFee,
+                    status: 'Chưa đóng'
+                };
+
+                students.push(newStudent);
+                showToast("Đã thêm", `Đã thêm thành công học viên ${name}!`, "success");
+            } else {
+                // Chế độ EDIT
+                selectedStudentForEdit.name = name;
+                selectedStudentForEdit.phone = phone;
+                selectedStudentForEdit.cccd = cccd;
+                selectedStudentForEdit.classes = classes;
+                selectedStudentForEdit.totalFee = totalFee;
+
+                showToast("Đã cập nhật", `Cập nhật thông tin em ${name} thành công!`, "success");
+            }
+
+            saveStudentsDataToLocal();
+            renderAdminTable();
+            closeStudentModal();
+        }
+
+        // --- 12. TRÌNH GIẢ LẬP ĐỐI SOÁT NGÂN HÀNG (AUTO-GẠCH NỢ) ---
+        function triggerSimulatedBankWebhook() {
+            const select = document.getElementById('sim-student-select');
+            const studentId = select.value;
+
+            if (!studentId || studentId.startsWith("Tất cả")) {
+                showToast("Cảnh báo", "Không có học sinh nào đang nợ để giả lập!", "warning");
+                return;
+            }
+
+            const student = students.find(s => s.id === studentId);
+            if (!student) return;
+
+            // Tiến hành gạch nợ học sinh
+            student.status = 'Đã đóng';
+            saveStudentsDataToLocal();
+            renderAdminTable();
+
+            // Phát âm thanh & Thông báo nổi
+            playTingTing();
+            showToast(
+                "Biến động số dư: + " + student.totalFee.toLocaleString('vi-VN') + "đ", 
+                `Hệ thống Auto-Banking tự động nhận dạng em ${student.name} (${student.id}) nộp phí môn học!`, 
+                "success"
+            );
+
+            // Đồng bộ trực tiếp màn hình phụ huynh đang xem nếu có trùng khớp
+            const activeId = document.getElementById('p-student-id').innerText;
+            if (activeId === student.id) {
+                displayParentResult(student);
+            }
+        }
+
+        // --- 13. TÍNH NĂNG ĐỒNG BỘ GOOGLE SHEETS THỰC TẾ ---
+        function syncWithGoogleSheets() {
+            if (!config.sheetsUrl) return;
+
+            // Gọi API nhận dữ liệu học sinh thực tế từ Apps Script
+            fetch(`${config.sheetsUrl}?action=getStudents`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && Array.isArray(data)) {
+                        students = data;
+                        saveStudentsDataToLocal();
+                        renderAdminTable();
+                        
+                        // Cập nhật lại giao diện phụ huynh
+                        const activeId = document.getElementById('p-student-id').innerText;
+                        if (activeId) {
+                            const updatedStudent = students.find(s => s.id === activeId);
+                            if (updatedStudent) {
+                                displayParentResult(updatedStudent);
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error("Lỗi đồng bộ hóa Google Sheets: ", err);
+                });
+        }
+    </script>
+</body>
+</html>
